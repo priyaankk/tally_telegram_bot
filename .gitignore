@@ -1,0 +1,31 @@
+# Secrets and your own business data: never commit these.
+.env*
+!.env.example
+*.json
+config/masters*.toml
+!config/masters.example.toml
+*.bak
+data/
+tally_export/
+sheets/*
+!sheets/*.example.csv
+*.xml
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[pP][nN][gG]
+*.heic
+*.webp
+*.pdf
+*.ogg
+*.zip
+*.log
+nohup.out
+
+# Build and tool output
+.venv/
+__pycache__/
+out/
+build/
+.pytest_cache/
+.ruff_cache/
+*.tmp

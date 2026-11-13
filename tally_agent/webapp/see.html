@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tally files</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
+    --card: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #fff));
+    --text: var(--tg-theme-text-color, #111);
+    --hint: var(--tg-theme-hint-color, #8a8a8e);
+    --accent: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #2481cc));
+    --btn: var(--tg-theme-button-color, #2481cc);
+    --btn-text: var(--tg-theme-button-text-color, #fff);
+    --danger: var(--tg-theme-destructive-text-color, #d63c3c);
+    --sep: var(--tg-theme-section-separator-color, rgba(128, 128, 128, .18));
+    --warn: #c77700;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         -webkit-tap-highlight-color: transparent; }
+  main { max-width: 640px; margin: 0 auto; padding: 12px 16px 96px; }
+  .tabs { display: flex; gap: 4px; background: var(--card); border-radius: 10px; padding: 4px; margin-bottom: 14px; }
+  .tabs button { flex: 1; border: 0; background: none; color: var(--hint); font: inherit; font-weight: 600;
+                 padding: 8px; border-radius: 7px; cursor: pointer; }
+  .tabs button.on { background: var(--btn); color: var(--btn-text); }
+  h2 { font-size: 13px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: .03em;
+       margin: 18px 4px 6px; display: flex; justify-content: space-between; gap: 8px; }
+  h2 span:last-child { text-transform: none; letter-spacing: 0; }
+  .card { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-top: 1px solid var(--sep); }
+  .row:first-child { border-top: 0; }
+  .row.tap { cursor: pointer; }
+  .row.tap:active { background: var(--sep); }
+  .grow { flex: 1; min-width: 0; }
+  .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { color: var(--hint); font-size: 13px; }
+  .amt { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .muted { opacity: .55; }
+  .badge { font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 6px; white-space: nowrap;
+           background: var(--sep); color: var(--hint); }
+  .badge.warn { color: var(--warn); background: rgba(199, 119, 0, .12); }
+  .empty { color: var(--hint); text-align: center; padding: 28px 12px; }
+  .head { padding: 16px 14px; }
+  .head .big { font-size: 20px; font-weight: 700; }
+  .note { color: var(--hint); font-size: 13px; padding: 8px 4px; }
+  .warnbox { color: var(--warn); padding: 10px 14px; border-top: 1px solid var(--sep); font-size: 14px; }
+  .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .btn { border: 0; border-radius: 10px; padding: 13px; font: inherit; font-weight: 600; cursor: pointer;
+         background: var(--btn); color: var(--btn-text); width: 100%; }
+  .btn.plain { background: var(--card); color: var(--accent); }
+  .btn.danger { background: var(--card); color: var(--danger); }
+  .btn:disabled { opacity: .5; }
+  label { display: block; font-size: 13px; color: var(--hint); margin: 12px 4px 4px; }
+  input { width: 100%; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--sep);
+          border-radius: 10px; padding: 11px 12px; outline: none; }
+  input:focus { border-color: var(--btn); }
+  .line { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .line .item { flex: 1; min-width: 0; }
+  .line .qty { width: 92px; flex: none; }
+  .x { border: 0; background: none; color: var(--danger); font-size: 22px; line-height: 1; padding: 4px 6px; cursor: pointer; }
+  .err { color: var(--danger); background: var(--card); border-radius: 10px; padding: 10px 12px; margin-top: 12px; }
+  .center { text-align: center; padding: 48px 16px; color: var(--hint); }
+</style>
+</head>
+<body>
+<main id="app"><div class="center">Loading…</div></main>
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+const app = document.getElementById("app");
+let data = null, tab = "waiting", view = { name: "list" };
+
+if (tg) { tg.ready(); tg.expand(); tg.BackButton.onClick(() => show({ name: "list" })); }
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = x => x == null ? "" : "₹" + Number(x).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const day = iso => iso ? iso.split("-").reverse().join("-") : "no date";
+const qty = q => Number(q).toLocaleString("en-IN", { maximumFractionDigits: 3 });
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const sum = xs => xs.reduce((a, b) => a + Number(b || 0), 0);
+
+function alertBox(text) { return new Promise(ok => tg ? tg.showAlert(text, ok) : (alert(text), ok())); }
+function confirmBox(text) { return new Promise(ok => tg ? tg.showConfirm(text, ok) : ok(confirm(text))); }
+function buzz(kind) { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred(kind); }
+
+async function call(action, extra = {}) {
+  const res = await fetch("api", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData: tg ? tg.initData : "", action, ...extra }) });
+  const body = await res.json().catch(() => ({ error: "The bot didn't answer. Please try again." }));
+  if (body.state) data = body.state;
+  if (!res.ok) throw new Error(body.error || "Something went wrong.");
+  return body;
+}
+
+function show(next) {
+  view = next;
+  if (tg) next.name === "list" ? tg.BackButton.hide() : tg.BackButton.show();
+  render();
+  window.scrollTo(0, 0);
+}
+
+function render() {
+  if (!data) return;
+  const views = { list: renderList, slip: renderSlip, edit: renderEdit, filed: renderFiled };
+  app.innerHTML = views[view.name]();
+  bind();
+}
+
+// -- the two tabs ----------------------------------------------------------------------
+function renderList() {
+  const waitingTotal = sum(data.waiting.map(w => w.total));
+  const tabs = `<div class="tabs">
+    <button data-tab="waiting" class="${tab === "waiting" ? "on" : ""}">Waiting (${data.waiting.length})</button>
+    <button data-tab="files" class="${tab === "files" ? "on" : ""}">Tally files</button></div>`;
+  if (tab === "files") return tabs + renderFiles();
+
+  let html = tabs;
+  if (data.checking.length) {
+    html += `<h2><span>Being checked in the chat</span></h2><div class="card">` + data.checking.map(c => `
+      <div class="row muted"><div class="grow"><div class="title">Ch ${esc(c.challan || "–")} · ${esc(c.party)}</div>
+      <div class="sub">${day(c.date)} · tap ✅ Save in the chat</div></div></div>`).join("") + `</div>`;
+  }
+  html += `<h2><span>Waiting for the next Tally file</span><span>${data.waiting.length ? money(waitingTotal) : ""}</span></h2>`;
+  if (!data.waiting.length) return html + `<div class="card"><div class="empty">Nothing waiting.</div></div>`;
+  return html + `<div class="card">` + data.waiting.map((w, i) => `
+    <div class="row tap" data-slip="${i}"><div class="grow">
+      <div class="title">Ch ${esc(w.challan || "–")} · ${esc(w.party)}</div>
+      <div class="sub">${day(w.date)} · ${plural(w.lines.length, "item")}</div></div>
+      ${w.total ? `<span class="amt">${money(w.total)}</span>` : `<span class="badge warn">⚠️ not ready</span>`}
+    </div>`).join("") + `</div>
+    <div class="note">Amounts use today's rates sheet. Tap a slip to fix or delete it.</div>`;
+}
+
+function renderFiles() {
+  if (!data.files.length) return `<div class="card"><div class="empty">No Tally files yet.</div></div>`;
+  return data.files.map((f, fi) => `
+    <h2><span>${esc(f.when)}</span><span>${plural(f.slips.length, "invoice")} · ${money(f.total)}</span></h2>
+    <div class="card">` + f.slips.map((s, si) => `
+      <div class="row tap ${s.in_tally ? "" : "muted"}" data-filed="${fi}:${si}"><div class="grow">
+        <div class="title">Ch ${esc(s.challan || "–")} · ${esc(s.party)}</div>
+        <div class="sub">${day(s.date)}</div></div>
+        ${s.in_tally ? "" : `<span class="badge">taken back</span>`}
+        <span class="amt">${money(s.total)}</span>
+      </div>`).join("") + `</div>`).join("") +
+    `<div class="note">If Tally didn't import an invoice, tap it to take it back into the waiting list.</div>`;
+}
+
+// -- a waiting slip --------------------------------------------------------------------
+function renderSlip() {
+  const w = data.waiting.find(w => w.id === view.id);
+  if (!w) return `<div class="center">This slip is no longer waiting.</div>`;
+  return `<div class="card"><div class="head"><div class="big">${esc(w.party)}</div>
+      <div class="sub">${day(w.date)} · Challan ${esc(w.challan || "–")}</div></div>` +
+    w.lines.map(l => `<div class="row"><div class="grow">${esc(l.item)}</div>
+      <span class="amt">${qty(l.qty)} ${esc(l.unit)}</span></div>`).join("") +
+    (w.total ? `<div class="row"><div class="grow"><b>Total</b> <span class="sub">at today's rates</span></div>
+      <span class="amt"><b>${money(w.total)}</b></span></div>` : `<div class="warnbox">⚠️ ${esc(w.problem)}</div>`) +
+    `</div><div class="actions">
+      <button class="btn" data-act="edit">✏️ Edit</button>
+      <button class="btn danger" data-act="delete">🗑 Delete slip</button></div>`;
+}
+
+function renderEdit() {
+  const d = view.draft;
+  return `<h2><span>Edit challan ${esc(d.challan || "")}</span></h2>
+    <datalist id="parties">${data.parties.map(p => `<option value="${esc(p)}">`).join("")}</datalist>
+    <datalist id="items">${data.items.map(i => `<option value="${esc(i)}">`).join("")}</datalist>
+    <label>Customer</label><input id="party" list="parties" value="${esc(d.party)}" autocomplete="off">
+    <label>Date</label><input id="date" type="date" value="${esc(d.date || "")}">
+    <label>Challan</label><input id="challan" inputmode="numeric" value="${esc(d.challan || "")}">
+    <label>Items</label><div id="lines">` + d.lines.map((l, i) => `
+      <div class="line"><input class="item" list="items" data-line="${i}" data-field="item" value="${esc(l.item)}" autocomplete="off">
+      <input class="qty" type="number" inputmode="decimal" min="0" step="any" data-line="${i}" data-field="qty" value="${esc(l.qty)}">
+      <button class="x" data-remove="${i}" aria-label="Remove line">×</button></div>`).join("") + `</div>
+    <div class="actions"><button class="btn plain" data-act="add">+ Add item</button></div>
+    ${view.error ? `<div class="err">${esc(view.error)}</div>` : ""}
+    <div class="actions"><button class="btn" data-act="save">Save changes</button>
+      <button class="btn plain" data-act="cancel">Cancel</button></div>`;
+}
+
+// -- a slip in a Tally file ------------------------------------------------------------
+function renderFiled() {
+  const f = data.files[view.file], s = f && f.slips[view.slip];
+  if (!s) return `<div class="center">Not found.</div>`;
+  return `<div class="card"><div class="head"><div class="big">${esc(s.party)}</div>
+      <div class="sub">${day(s.date)} · Challan ${esc(s.challan || "–")} · Tally file ${esc(f.when)}</div></div>` +
+    s.lines.map(l => `<div class="row"><div class="grow">${esc(l.item)}<div class="sub">${esc(l.qty)} × ${money(l.rate)}</div></div>
+      <span class="amt">${money(l.amount)}</span></div>`).join("") +
+    `<div class="row"><div class="grow"><b>Total</b></div><span class="amt"><b>${money(s.total)}</b></span></div></div>` +
+    (s.in_tally
+      ? `<div class="actions"><button class="btn danger" data-act="takeback">↩️ Didn't import: take back</button></div>
+         <div class="note">Only if Tally didn't import this invoice. It goes back to the waiting list and into the next Tally file.</div>`
+      : `<div class="note">Taken back: it wasn't imported into Tally from this file.</div>`);
+}
+
+// -- actions ---------------------------------------------------------------------------
+function readForm() {
+  const d = view.draft;
+  d.party = document.getElementById("party").value;
+  d.date = document.getElementById("date").value;
+  d.challan = document.getElementById("challan").value;
+  document.querySelectorAll("[data-line]").forEach(el => { d.lines[+el.dataset.line][el.dataset.field] = el.value; });
+}
+
+async function act(name, button) {
+  if (button) button.disabled = true;
+  try {
+    if (name === "edit") {
+      const w = data.waiting.find(w => w.id === view.id);
+      return show({ name: "edit", id: w.id, draft: { party: w.party, date: w.date, challan: w.challan,
+                                                       lines: w.lines.map(l => ({ item: l.item, qty: l.qty })) } });
+    }
+    if (name === "add") { readForm(); view.draft.lines.push({ item: "", qty: "" }); return render(); }
+    if (name === "cancel") return show({ name: "slip", id: view.id });
+    if (name === "save") {
+      readForm();
+      const lines = view.draft.lines.filter(l => l.item.trim() || String(l.qty).trim());
+      if (!lines.length) { view.error = "A slip needs at least one item."; return render(); }
+      try {
+        await call("edit", { id: view.id, slip: { ...view.draft, lines } });
+      } catch (e) { view.error = e.message; buzz("error"); return render(); }
+      buzz("success");
+      return show({ name: "slip", id: view.id });
+    }
+    if (name === "delete") {
+      if (!await confirmBox("Delete this slip? It won't go in a Tally file.")) return;
+      await call("delete", { id: view.id }); buzz("success"); tab = "waiting";
+      return show({ name: "list" });
+    }
+    if (name === "takeback") {
+      const f = data.files[view.file], s = f.slips[view.slip];
+      if (!await confirmBox(`Take back challan ${s.challan || ""} of ${s.party}? Only do this if Tally didn't import it.`)) return;
+      await call("take_back", { file: f.name, ledger: s.ledger, date: s.date, challan: s.challan });
+      buzz("success"); tab = "waiting";
+      return show({ name: "list" });
+    }
+  } catch (e) { buzz("error"); await alertBox(e.message); render(); }
+  finally { if (button) button.disabled = false; }
+}
+
+function bind() {
+  app.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
+  app.querySelectorAll("[data-slip]").forEach(r => r.onclick = () => show({ name: "slip", id: data.waiting[+r.dataset.slip].id }));
+  app.querySelectorAll("[data-filed]").forEach(r => r.onclick = () => {
+    const [file, slip] = r.dataset.filed.split(":").map(Number); show({ name: "filed", file, slip }); });
+  app.querySelectorAll("[data-act]").forEach(b => b.onclick = () => act(b.dataset.act, b));
+  app.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => {
+    readForm(); view.draft.lines.splice(+b.dataset.remove, 1); render(); });
+}
+
+call("state").then(render).catch(e => {
+  app.innerHTML = `<div class="center">${esc(e.message)}</div>`;
+});
+</script>
+</body>
+</html>

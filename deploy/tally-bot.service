@@ -1,0 +1,19 @@
+[Unit]
+Description=Tally slip bot (Telegram → Tally XML)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=%h/tally_telegram_bot/.venv/bin/python -m tally_agent.bot
+# Settings and secrets come from %h/tally_telegram_bot/.env (read by the bot itself).
+WorkingDirectory=%h/tally_telegram_bot
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+Environment=PYTHONUNBUFFERED=1
+MemoryHigh=768M
+MemoryMax=1G
+
+[Install]
+WantedBy=default.target

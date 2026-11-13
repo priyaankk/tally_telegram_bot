@@ -1,0 +1,24 @@
+[project]
+name = "tally-agent"
+version = "0.1.0"
+description = "Telegram bot: photos of handwritten delivery slips -> Tally Sales vouchers (XML)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.43.111",
+    "gspread>=6.2.1",
+    "numpy>=2.5.3",
+    "openai>=3.28.0",
+    "pillow>=12.3.0",
+    "pydantic>=2.14.0",
+    "python-dotenv>=1.2.4",
+    "python-telegram-bot[job-queue]>=22",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

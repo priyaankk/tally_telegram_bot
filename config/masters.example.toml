@@ -1,0 +1,31 @@
+# EXAMPLE ONLY. The real config/masters.toml is GENERATED from your own Tally export:
+#   uv run python -m tally_agent.tally_import Master.xml DayBook.xml
+# To try the bot without Tally, copy this file to config/masters.toml.
+# Names must match Tally exactly (including trailing spaces).
+
+company = "Demo Co 26/27"
+voucher_type = "Sales"
+sales_ledger = "SALES A/C"
+godown = "Main Location"
+
+[[parties]]
+ledger = "ACME TRADERS "
+
+[[parties]]
+ledger = "B&C STORES"
+
+[[items]]
+name = "S3 SCREW"
+unit = "PCS"
+
+[[items]]
+name = "N3 NUT"
+unit = "PCS"
+
+[[items]]
+name = "H4 HINGE"
+unit = "PCS"
+
+[[items]]
+name = "CLIPS"
+unit = "PCS"

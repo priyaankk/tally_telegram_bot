@@ -1,0 +1,19 @@
+# Hand-written hints that help the bot read slips. Edit freely.
+# Names on the left must be exact Tally names (see config/masters.toml).
+# Spellings the bot learns from confirmed slips are stored separately (data/learned_aliases.json).
+#
+# Everything below is a made-up example: replace it with your own items and customers.
+
+glossary = [
+  "S<n> SCREW = pan screw (slips write 'Pan Screw', 'Screw S3')",
+  "N<n> NUT = hex nut (slips write 'Hex Nut', 'Hex Nutt')",
+  "HINGE is often written 'Hing' or 'Hindge'",
+]
+
+[item_aliases]
+"S3 SCREW" = ["Pan Screw"]
+"N3 NUT" = ["Hex Nut", "Hex Nutt"]
+"H4 HINGE" = ["H4 Hing", "Hinge H4"]
+
+[party_aliases]
+"ACME TRADERS " = ["M/s ACME", "ACME"]
